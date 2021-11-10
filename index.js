@@ -23,6 +23,7 @@ async function run() {
         const watchesCollection = database.collection('watches');
         const usersCollection = database.collection('users');
         const reviewsCollection = database.collection('reviews');
+        const purchasesCollection = database.collection('purchases');
 
         //---------------------Watches Routes-----------------------------------------
         // GET  - get watches data
@@ -72,6 +73,26 @@ async function run() {
         app.post('/review', async (req, res) => {
             const data = req.body;
             const insertOperation = await reviewsCollection.insertOne(data);
+            if (insertOperation.acknowledged) {
+                res.send(true);
+            }
+            else {
+                res.send(false);
+            }
+        });
+
+        //---------------------Purchase Routes-----------------------------------------
+        // GET  - get purchases data
+        app.get('/purchases', async (req, res) => {
+            const cursor = purchasesCollection.find({});
+            const purchases = await cursor.toArray();
+            res.send(purchases);
+        });
+
+        // POST - saving purchase in db
+        app.post('/purchase', async (req, res) => {
+            const data = req.body;
+            const insertOperation = await purchasesCollection.insertOne(data);
             if (insertOperation.acknowledged) {
                 res.send(true);
             }
