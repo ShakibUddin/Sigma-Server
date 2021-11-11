@@ -43,6 +43,18 @@ async function run() {
                 res.send(false);
             }
         });
+        // DELETE  - delete a product
+        app.delete('/product/delete/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const deleteOperation = await productsCollection.deleteOne(query);
+            if (deleteOperation.acknowledged) {
+                res.send(true);
+            }
+            else {
+                res.send(false);
+            }
+        });
 
         //---------------------User Routes-----------------------------------------
         //UPSERT - update user if exists or insert new
@@ -69,6 +81,32 @@ async function run() {
             }
             else {
                 res.send("UNREGISTERED-USER");
+            }
+        });
+        // PUT API - update a user role to admin
+        app.put('/admin/:email', async (req, res) => {
+            const email = req.params.email;
+            // create a filter for a user to update
+            const filter = { 'email': email };
+            const updateDoc = {
+                $set: {
+                    role: "ADMIN"
+                },
+            };
+            const user = await usersCollection.findOne({ email: email });
+            //if user exists then update to admin
+            console.log(user)
+            if (user) {
+                const updateOperation = await usersCollection.updateOne(filter, updateDoc);
+                if (updateOperation.acknowledged) {
+                    res.send(true);
+                }
+                else {
+                    res.send(false);
+                }
+            }
+            else {
+                res.send(false);
             }
         });
 
@@ -128,7 +166,7 @@ async function run() {
             // create a document that sets the approved value of purchase
             const updateDoc = {
                 $set: {
-                    status: "Approved"
+                    status: "Shipped"
                 },
             };
             const updateOperation = await purchasesCollection.updateOne(filter, updateDoc);
@@ -140,7 +178,6 @@ async function run() {
             }
         });
 
-        //---------------------Admin Routes-----------------------------------------
 
     }
     finally {
