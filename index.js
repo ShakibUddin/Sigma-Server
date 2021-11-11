@@ -20,23 +20,22 @@ async function run() {
     try {
         await client.connect();
         const database = client.db(process.env.DB_NAME);
-        const watchesCollection = database.collection('watches');
+        const productsCollection = database.collection('products');
         const usersCollection = database.collection('users');
         const reviewsCollection = database.collection('reviews');
         const purchasesCollection = database.collection('purchases');
 
-        //---------------------Watches Routes-----------------------------------------
-        // GET  - get watches data
-        app.get('/watches', async (req, res) => {
-            const cursor = watchesCollection.find({});
-            const watches = await cursor.toArray();
-            res.send(watches);
+        //---------------------Products Routes-----------------------------------------
+        // GET  - get products data
+        app.get('/products', async (req, res) => {
+            const cursor = productsCollection.find({});
+            const products = await cursor.toArray();
+            res.send(products);
         });
-
         // POST - saving product in db
-        app.post('/product', async (req, res) => {
+        app.post('/product/add', async (req, res) => {
             const data = req.body;
-            const insertOperation = await watchesCollection.insertOne(data);
+            const insertOperation = await productsCollection.insertOne(data);
             if (insertOperation.acknowledged) {
                 res.send(true);
             }
@@ -60,6 +59,18 @@ async function run() {
                 res.send(false);
             }
         });
+        //GET - get user role
+        app.get('/user/role/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email };
+            const user = await usersCollection.findOne(query);
+            if (user) {
+                res.send(user.role);
+            }
+            else {
+                res.send("UNREGISTERED-USER");
+            }
+        });
 
         //---------------------Review Routes-----------------------------------------
         // GET  - get reviews data
@@ -68,9 +79,8 @@ async function run() {
             const reviews = await cursor.toArray();
             res.send(reviews);
         });
-
         // POST - saving product in db
-        app.post('/review', async (req, res) => {
+        app.post('/review/add', async (req, res) => {
             const data = req.body;
             const insertOperation = await reviewsCollection.insertOne(data);
             if (insertOperation.acknowledged) {
@@ -88,9 +98,8 @@ async function run() {
             const purchases = await cursor.toArray();
             res.send(purchases);
         });
-
         // POST - saving purchase in db
-        app.post('/purchase', async (req, res) => {
+        app.post('/purchase/add', async (req, res) => {
             const data = req.body;
             const insertOperation = await purchasesCollection.insertOne(data);
             if (insertOperation.acknowledged) {
@@ -100,6 +109,39 @@ async function run() {
                 res.send(false);
             }
         });
+        // DELETE  - delete a purchase
+        app.delete('/purchase/delete/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const deleteOperation = await purchasesCollection.deleteOne(query);
+            if (deleteOperation.acknowledged) {
+                res.send(true);
+            }
+            else {
+                res.send(false);
+            }
+        });
+        // PUT API - update a purchase status
+        app.put('/purchase/update/:id', async (req, res) => {
+            // create a filter for a purchase to update
+            const filter = { '_id': ObjectId(req.params.id) };
+            // create a document that sets the approved value of purchase
+            const updateDoc = {
+                $set: {
+                    status: "Approved"
+                },
+            };
+            const updateOperation = await purchasesCollection.updateOne(filter, updateDoc);
+            if (updateOperation.acknowledged) {
+                res.send(true);
+            }
+            else {
+                res.send(false);
+            }
+        });
+
+        //---------------------Admin Routes-----------------------------------------
+
     }
     finally {
         // await client.close();
