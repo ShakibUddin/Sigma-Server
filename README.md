@@ -10,3 +10,5 @@ We provide quality watches with fast delivery, free shipment across Australia an
 - Admin can delete watches
 - Only admins can make other members admin
 - Github,Google,Email based authentication
+
+Live => https://sigma-sakib.netlify.app
