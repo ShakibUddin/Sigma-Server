@@ -12,16 +12,14 @@ admin.initializeApp({
 });
 
 const verifyToken = async (req, res, next) => {
-    if (req.headers?.authorization?.startWith("Bearer ")) {
-        const token = req.headers?.authorization.split(" ")[1];
-
+    if (req.headers?.authorization?.startsWith('Bearer ')) {
+        const idToken = req.headers.authorization.split('Bearer ')[1];
         try {
-            const decodedUser = await admin.auth().verifyToken(token);
-            req.decodedEmail = decodedUser.email;
-            console.log("decoded email ", decodedEmail);
+            const decodedUser = await admin.auth().verifyIdToken(idToken);
+            req.decodedUserEmail = decodedUser.email;
         }
         catch {
-            error => console.log(error);
+            e => console.log(e);
         }
     }
     next();
@@ -54,26 +52,60 @@ async function run() {
             res.send(products);
         });
         // POST - saving product in db
-        app.post('/product/add', async (req, res) => {
+        app.post('/product/add', verifyToken, async (req, res) => {
             const data = req.body;
-            const insertOperation = await productsCollection.insertOne(data);
-            if (insertOperation.acknowledged) {
-                res.send(true);
+            const clientEmail = req.decodedUserEmail;
+            if (clientEmail) {
+                const clientUser = await usersCollection.findOne({ email: clientEmail });
+                if (clientUser) {
+                    if (clientUser.role === "ADMIN") {
+                        const insertOperation = await productsCollection.insertOne(data);
+                        if (insertOperation.acknowledged) {
+                            res.send(true);
+                        }
+                        else {
+                            res.send(false);
+                        }
+                    }
+                    else {
+                        res.status(403).send("Forbidden");
+                    }
+                }
+                else {
+                    res.status(401).send("Unauthorized");
+                }
             }
             else {
-                res.send(false);
+                res.status(401).send("Unauthorized");
             }
         });
         // DELETE  - delete a product
-        app.delete('/product/delete/:id', async (req, res) => {
+        app.delete('/product/delete/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
-            const query = { "_id": ObjectId(id) };
-            const deleteOperation = await productsCollection.deleteOne(query);
-            if (deleteOperation.acknowledged) {
-                res.send(true);
+            const clientEmail = req.decodedUserEmail;
+            if (clientEmail) {
+                const clientUser = await usersCollection.findOne({ email: clientEmail });
+                if (clientUser) {
+                    if (clientUser.role === "ADMIN") {
+                        const query = { "_id": ObjectId(id) };
+                        const deleteOperation = await productsCollection.deleteOne(query);
+                        if (deleteOperation.acknowledged) {
+                            res.send(true);
+                        }
+                        else {
+                            res.send(false);
+                        }
+                    }
+                    else {
+                        res.status(403).send("Forbidden");
+                    }
+                }
+                else {
+                    res.status(401).send("Unauthorized");
+                }
             }
             else {
-                res.send(false);
+                res.status(401).send("Unauthorized");
             }
         });
 
@@ -107,41 +139,43 @@ async function run() {
         // PUT API - update a user role to admin
         app.put('/admin/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
-            const clientEmail = req.decodedEmail;
-            console.log("decoded client email ", clientEmail);
+            const clientEmail = req.decodedUserEmail;
             if (clientEmail) {
                 const clientUser = await usersCollection.findOne({ email: clientEmail });
-                console.log("decoded client ", clientUser);
-                if (clientUser.role === "ADMIN") {
-                    // create a filter for a user to update
-                    const filter = { 'email': email };
-                    const updateDoc = {
-                        $set: {
-                            role: "ADMIN"
-                        },
-                    };
-                    const user = await usersCollection.findOne({ email: email });
-                    //if user exists then update to admin
-                    console.log(user)
-                    if (user) {
-                        const updateOperation = await usersCollection.updateOne(filter, updateDoc);
-                        if (updateOperation.acknowledged) {
-                            res.send(true);
+                if (clientUser) {
+                    if (clientUser.role === "ADMIN") {
+                        // create a filter for a user to update
+                        const filter = { 'email': email };
+                        const updateDoc = {
+                            $set: {
+                                role: "ADMIN"
+                            },
+                        };
+                        const user = await usersCollection.findOne({ email: email });
+                        //if user exists then update to admin
+                        if (user) {
+                            const updateOperation = await usersCollection.updateOne(filter, updateDoc);
+                            if (updateOperation.acknowledged) {
+                                res.send(true);
+                            }
+                            else {
+                                res.send(false);
+                            }
                         }
                         else {
                             res.send(false);
                         }
                     }
                     else {
-                        res.send(false);
+                        res.status(403).send("Forbidden");
                     }
                 }
                 else {
-                    res.status(403).send("You are not admin");
+                    res.status(401).send("Unauthorized");
                 }
             }
             else {
-                res.status(403).send("Unauthorized User");
+                res.status(401).send("Unauthorized");
             }
 
         });
@@ -154,63 +188,138 @@ async function run() {
             res.send(reviews);
         });
         // POST - saving product in db
-        app.post('/review/add', async (req, res) => {
+        app.post('/review/add', verifyToken, async (req, res) => {
             const data = req.body;
-            const insertOperation = await reviewsCollection.insertOne(data);
-            if (insertOperation.acknowledged) {
-                res.send(true);
+            const clientEmail = req.decodedUserEmail;
+            if (clientEmail) {
+                const clientUser = await usersCollection.findOne({ email: clientEmail });
+                if (clientUser) {
+                    if (clientUser.role === "USER") {
+                        const insertOperation = await reviewsCollection.insertOne(data);
+                        if (insertOperation.acknowledged) {
+                            res.send(true);
+                        }
+                        else {
+                            res.send(false);
+                        }
+                    }
+                    else {
+                        res.status(403).send("Forbidden");
+                    }
+                }
+                else {
+                    res.status(401).send("Unregistered");
+                }
             }
             else {
-                res.send(false);
+                res.status(401).send("Unregistered");
             }
         });
 
         //---------------------Purchase Routes-----------------------------------------
         // GET  - get purchases data
-        app.get('/purchases', async (req, res) => {
-            const cursor = purchasesCollection.find({});
-            const purchases = await cursor.toArray();
-            res.send(purchases);
-        });
-        // POST - saving purchase in db
-        app.post('/purchase/add', async (req, res) => {
-            const data = req.body;
-            const insertOperation = await purchasesCollection.insertOne(data);
-            if (insertOperation.acknowledged) {
-                res.send(true);
+        app.get('/purchases', verifyToken, async (req, res) => {
+            const clientEmail = req.decodedUserEmail;
+            if (clientEmail) {
+                const clientUser = await usersCollection.findOne({ email: clientEmail });
+                if (clientUser) {
+                    const cursor = purchasesCollection.find({});
+                    const purchases = await cursor.toArray();
+                    res.send(purchases);
+                }
+                else {
+                    res.status(401).send("Unregistered");
+                }
             }
             else {
-                res.send(false);
+                res.status(401).send("Unregistered");
+            }
+        });
+        // POST - saving purchase in db
+        app.post('/purchase/add', verifyToken, async (req, res) => {
+            const data = req.body;
+            const clientEmail = req.decodedUserEmail;
+            if (clientEmail) {
+                const clientUser = await usersCollection.findOne({ email: clientEmail });
+                if (clientUser) {
+                    if (clientUser.role === "USER") {
+                        const insertOperation = await purchasesCollection.insertOne(data);
+                        if (insertOperation.acknowledged) {
+                            res.send(true);
+                        }
+                        else {
+                            res.send(false);
+                        }
+                    }
+                    else {
+                        res.status(403).send("Forbidden");
+                    }
+                }
+                else {
+                    res.status(401).send("Unregistered");
+                }
+            }
+            else {
+                res.status(401).send("Unregistered");
             }
         });
         // DELETE  - delete a purchase
-        app.delete('/purchase/delete/:id', async (req, res) => {
+        app.delete('/purchase/delete/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
-            const query = { _id: ObjectId(id) };
-            const deleteOperation = await purchasesCollection.deleteOne(query);
-            if (deleteOperation.acknowledged) {
-                res.send(true);
+            const clientEmail = req.decodedUserEmail;
+            if (clientEmail) {
+                const clientUser = await usersCollection.findOne({ email: clientEmail });
+                if (clientUser) {
+                    const query = { _id: ObjectId(id) };
+                    const deleteOperation = await purchasesCollection.deleteOne(query);
+                    if (deleteOperation.acknowledged) {
+                        res.send(true);
+                    }
+                    else {
+                        res.send(false);
+                    }
+                }
+                else {
+                    res.status(401).send("Unregistered");
+                }
             }
             else {
-                res.send(false);
+                res.status(401).send("Unregistered");
             }
         });
         // PUT API - update a purchase status
-        app.put('/purchase/update/:id', async (req, res) => {
+        app.put('/purchase/update/:id', verifyToken, async (req, res) => {
             // create a filter for a purchase to update
             const filter = { '_id': ObjectId(req.params.id) };
-            // create a document that sets the approved value of purchase
-            const updateDoc = {
-                $set: {
-                    status: "Shipped"
-                },
-            };
-            const updateOperation = await purchasesCollection.updateOne(filter, updateDoc);
-            if (updateOperation.acknowledged) {
-                res.send(true);
+            const clientEmail = req.decodedUserEmail;
+            if (clientEmail) {
+                const clientUser = await usersCollection.findOne({ email: clientEmail });
+                if (clientUser) {
+                    if (clientUser.role === "ADMIN") {
+                        // create a document that sets the approved value of purchase
+                        const updateDoc = {
+                            $set: {
+                                status: "Shipped"
+                            },
+                        };
+                        const updateOperation = await purchasesCollection.updateOne(filter, updateDoc);
+                        if (updateOperation.acknowledged) {
+                            res.send(true);
+                        }
+                        else {
+                            res.send(false);
+                        }
+                    }
+                    else {
+                        res.status(403).send("Forbidden");
+                    }
+                }
+                else {
+                    res.status(401).send("Unregistered");
+                }
             }
             else {
-                res.send(false);
+                res.status(401).send("Unregistered");
             }
         });
 
