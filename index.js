@@ -4,7 +4,28 @@ const { MongoClient } = require('mongodb');
 require('dotenv').config();
 const ObjectId = require('mongodb').ObjectId;
 const app = express();
+const admin = require("firebase-admin");
+const serviceAccount = JSON.parse(process.env.SIGMA_FIREBASE_ADMIN_SDK);
 
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+});
+
+const verifyToken = async (req, res, next) => {
+    if (req.headers?.authorization?.startWith("Bearer ")) {
+        const token = req.headers?.authorization.split(" ")[1];
+
+        try {
+            const decodedUser = await admin.auth().verifyToken(token);
+            req.decodedEmail = decodedUser.email;
+            console.log("decoded email ", decodedEmail);
+        }
+        catch {
+            error => console.log(error);
+        }
+    }
+    next();
+}
 // middlewares
 app.use(cors());
 app.use(express.json());
@@ -84,30 +105,45 @@ async function run() {
             }
         });
         // PUT API - update a user role to admin
-        app.put('/admin/:email', async (req, res) => {
+        app.put('/admin/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
-            // create a filter for a user to update
-            const filter = { 'email': email };
-            const updateDoc = {
-                $set: {
-                    role: "ADMIN"
-                },
-            };
-            const user = await usersCollection.findOne({ email: email });
-            //if user exists then update to admin
-            console.log(user)
-            if (user) {
-                const updateOperation = await usersCollection.updateOne(filter, updateDoc);
-                if (updateOperation.acknowledged) {
-                    res.send(true);
+            const clientEmail = req.decodedEmail;
+            console.log("decoded client email ", clientEmail);
+            if (clientEmail) {
+                const clientUser = await usersCollection.findOne({ email: clientEmail });
+                console.log("decoded client ", clientUser);
+                if (clientUser.role === "ADMIN") {
+                    // create a filter for a user to update
+                    const filter = { 'email': email };
+                    const updateDoc = {
+                        $set: {
+                            role: "ADMIN"
+                        },
+                    };
+                    const user = await usersCollection.findOne({ email: email });
+                    //if user exists then update to admin
+                    console.log(user)
+                    if (user) {
+                        const updateOperation = await usersCollection.updateOne(filter, updateDoc);
+                        if (updateOperation.acknowledged) {
+                            res.send(true);
+                        }
+                        else {
+                            res.send(false);
+                        }
+                    }
+                    else {
+                        res.send(false);
+                    }
                 }
                 else {
-                    res.send(false);
+                    res.status(403).send("You are not admin");
                 }
             }
             else {
-                res.send(false);
+                res.status(403).send("Unauthorized User");
             }
+
         });
 
         //---------------------Review Routes-----------------------------------------
