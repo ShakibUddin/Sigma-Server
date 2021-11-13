@@ -110,6 +110,7 @@ async function run() {
         });
 
         //---------------------User Routes-----------------------------------------
+        // GET  - get user role
         app.get('/user/:email', async (req, res) => {
             const email = req.params.email;
             const user = await usersCollection.findOne({ email: email });
