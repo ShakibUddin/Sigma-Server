@@ -110,6 +110,16 @@ async function run() {
         });
 
         //---------------------User Routes-----------------------------------------
+        app.get('/user/:email', async (req, res) => {
+            const email = req.params.email;
+            const user = await usersCollection.findOne({ email: email });
+            if (user) {
+                res.send(user.role);
+            }
+            else {
+                res.send("Unauthorized");
+            }
+        })
         //UPSERT - update user if exists or insert new
         app.put('/user', async (req, res) => {
             const user = req.body;
@@ -122,18 +132,6 @@ async function run() {
             }
             else {
                 res.send(false);
-            }
-        });
-        //GET - get user role
-        app.get('/user/role/:email', async (req, res) => {
-            const email = req.params.email;
-            const query = { email: email };
-            const user = await usersCollection.findOne(query);
-            if (user) {
-                res.send(user.role);
-            }
-            else {
-                res.send("UNREGISTERED-USER");
             }
         });
         // PUT API - update a user role to admin
